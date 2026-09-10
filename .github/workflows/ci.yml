@@ -1,0 +1,104 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master, dev ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  backend-ci:
+    name: Backend CI (Lint, Typecheck & Test)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: slack_clone_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install Backend Dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Prisma Generate & Migrate
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/slack_clone_test?schema=public
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+
+      - name: Typecheck Backend
+        working-directory: ./backend
+        run: npm run build
+
+      - name: Run Backend Unit & Integration Tests
+        working-directory: ./backend
+        env:
+          NODE_ENV: test
+          PORT: 5001
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/slack_clone_test?schema=public
+          REDIS_URL: redis://localhost:6379
+          FRONTEND_URL: http://localhost:5173
+          JWT_ACCESS_SECRET: ci_test_access_secret_32_characters_long
+          JWT_REFRESH_SECRET: ci_test_refresh_secret_32_characters_long
+          ACCESS_TOKEN_EXPIRES_IN: 15m
+          REFRESH_TOKEN_EXPIRES_IN: 7d
+          RESET_PASSWORD_TOKEN_EXPIRES_IN: 1h
+        run: npx vitest run
+
+  frontend-ci:
+    name: Frontend CI (Typecheck, Unit & Build)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Typecheck & Build Frontend
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: Run Frontend Tests
+        working-directory: ./frontend
+        run: npx vitest run

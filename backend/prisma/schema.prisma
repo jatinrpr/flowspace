@@ -1,0 +1,364 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  AWAY
+  OFFLINE
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  VOICE
+}
+
+enum NotificationType {
+  DM
+  MENTION
+  CHANNEL
+  THREAD
+  SYSTEM
+}
+
+model User {
+  id                      String               @id @default(cuid())
+  name                    String
+  email                   String               @unique
+  passwordHash            String
+  avatarUrl               String?
+  status                  UserStatus           @default(OFFLINE)
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  workspaceMemberships    WorkspaceMember[]
+  channelMemberships      ChannelMember[]
+  sentMessages            Message[]            @relation("MessageSender")
+  reactions               Reaction[]
+  notifications           Notification[]
+  sessions                Session[]
+  passwordResetTokens     PasswordResetToken[]
+  sentInvitations         Invitation[]         @relation("InvitationSender")
+  createdChannels         Channel[]            @relation("ChannelCreator")
+  createdConversations    Conversation[]       @relation("ConversationCreator")
+  conversationMemberships ConversationMember[]
+  readStates              MessageReadState[]
+  mentions                MessageMention[]
+}
+
+model Workspace {
+  id            String            @id @default(cuid())
+  name          String
+  slug          String            @unique
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  members       WorkspaceMember[]
+  channels      Channel[]
+  conversations Conversation[]
+  invitations   Invitation[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        WorkspaceRole @default(MEMBER)
+  createdAt   DateTime      @default(now())
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+model Channel {
+  id          String             @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  isPrivate   Boolean            @default(false)
+  createdById String
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  creator     User               @relation("ChannelCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  members     ChannelMember[]
+  messages    Message[]
+  readStates  MessageReadState[]
+  notifications Notification[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@index([name])
+}
+
+model ChannelMember {
+  id        String   @id @default(cuid())
+  userId    String
+  channelId String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channelId])
+  @@index([channelId])
+  @@index([userId])
+}
+
+model Message {
+  id              String             @id @default(cuid())
+  senderId        String
+  channelId       String?
+  conversationId  String?
+  clientMessageId String?
+  content         String             @db.Text
+  type            MessageType        @default(TEXT)
+  threadId        String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  deletedAt       DateTime?
+  sender          User               @relation("MessageSender", fields: [senderId], references: [id], onDelete: Restrict)
+  channel         Channel?           @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  conversation    Conversation?      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  thread          Thread?            @relation("ThreadReplies", fields: [threadId], references: [id], onDelete: SetNull)
+  rootThread      Thread?            @relation("ThreadRoot")
+  reactions       Reaction[]
+  files           File[]
+  readStates      MessageReadState[]
+  mentions        MessageMention[]
+  notifications   Notification[]
+
+  @@index([channelId, createdAt])
+  @@index([conversationId, createdAt])
+  @@index([senderId, createdAt])
+  @@index([createdAt])
+  @@index([clientMessageId])
+}
+
+model MessageMention {
+  id              String   @id @default(cuid())
+  messageId       String
+  mentionedUserId String
+  createdAt       DateTime @default(now())
+  message         Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [mentionedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, mentionedUserId])
+  @@index([messageId])
+  @@index([mentionedUserId])
+}
+
+model Thread {
+  id            String    @id @default(cuid())
+  rootMessageId String    @unique
+  createdAt     DateTime  @default(now())
+  rootMessage   Message   @relation("ThreadRoot", fields: [rootMessageId], references: [id], onDelete: Cascade)
+  replies       Message[] @relation("ThreadReplies")
+}
+
+model Reaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+model File {
+  id           String   @id @default(cuid())
+  messageId    String
+  originalName String
+  storageKey   String   @unique
+  url          String
+  mimeType     String
+  size         Int
+  createdAt    DateTime @default(now())
+  message      Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+}
+
+model Notification {
+  id              String           @id @default(cuid())
+  userId          String
+  type            NotificationType
+  message         String
+  read            Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+
+  messageId       String?
+  workspaceId     String?
+  channelId       String?
+  conversationId  String?
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedMessage   Message?         @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  workspace       Workspace?       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  channel         Channel?         @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  conversation    Conversation?    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+  @@index([messageId])
+}
+
+model Session {
+  id        String    @id
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+  userAgent String?
+  ipAddress String?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Invitation {
+  id          String    @id @default(cuid())
+  workspaceId String
+  email       String
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  invitedById String
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy User      @relation("InvitationSender", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([tokenHash])
+}
+
+enum ConversationType {
+  DIRECT
+  GROUP
+}
+
+model Conversation {
+  id          String           @id @default(cuid())
+  workspaceId String
+  type        ConversationType
+  name        String?
+  createdById String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  workspace  Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  creator    User                 @relation("ConversationCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  members    ConversationMember[]
+  messages   Message[]
+  readStates MessageReadState[]
+  notifications Notification[]
+
+  @@index([workspaceId])
+}
+
+model ConversationMember {
+  id             String   @id @default(cuid())
+  conversationId String
+  userId         String
+  joinedAt       DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([conversationId])
+  @@index([userId])
+}
+
+model MessageReadState {
+  id                String   @id @default(cuid())
+  userId            String
+  channelId         String?
+  conversationId    String?
+  lastReadMessageId String
+  updatedAt         DateTime @updatedAt
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel         Channel?      @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  conversation    Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  lastReadMessage Message       @relation(fields: [lastReadMessageId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channelId])
+  @@unique([userId, conversationId])
+  @@index([userId])
+}
+
+enum AuditLogAction {
+  USER_INVITED
+  USER_REMOVED
+  USER_ROLE_CHANGED
+  CHANNEL_CREATED
+  CHANNEL_RENAMED
+  CHANNEL_ARCHIVED
+  CHANNEL_DELETED
+  WORKSPACE_UPDATED
+  WORKSPACE_DELETED
+  INVITATION_CREATED
+  INVITATION_REVOKED
+  INVITATION_ACCEPTED
+  MESSAGE_MODERATED
+  SECURITY_EVENT
+  AUTH_LOGIN
+  AUTH_LOGOUT
+  AUTH_PASSWORD_RESET
+}
+
+model AuditLog {
+  id          String         @id @default(cuid())
+  workspaceId String
+  actorUserId String?
+  action      AuditLogAction
+  targetType  String?
+  targetId    String?
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime       @default(now())
+
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, action])
+  @@index([actorUserId])
+}
+
