@@ -84,7 +84,11 @@ export function VoiceMessage({ url, initialDuration }: VoiceMessageProps) {
     if (audio.paused) {
       audio.play().catch(err => {
         console.error('Audio playback error:', err)
-        alert('Playback error: ' + (err.message || 'File unavailable'))
+        setIsPlaying(false)
+        const msg = url.includes('/uploads/')
+          ? 'This audio recording was from an earlier session and is no longer available. Please record a new voice message!'
+          : `Playback error: ${err.message || 'Unable to play audio'}`
+        alert(msg)
       })
     } else {
       audio.pause()

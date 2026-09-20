@@ -1,5 +1,6 @@
 import type { FileAttachment } from '../../store/messageStore'
 import { File, Image, Download } from 'lucide-react'
+import { getMediaUrl } from '../../utils/mediaUrl'
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 const VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime']
@@ -14,8 +15,7 @@ export function FileAttachmentList({ files }: { files: FileAttachment[] }) {
         const isVideo = VIDEO_TYPES.includes(file.mimeType) || file.mimeType.startsWith('video/')
         const sizeMb = (file.size / (1024 * 1024)).toFixed(2)
         
-        const backendBaseUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '') : 'http://localhost:5000'
-        const fullUrl = file.url.startsWith('http') ? file.url : `${backendBaseUrl}${file.url}`
+        const fullUrl = getMediaUrl(file.url)
 
         return (
           <div key={file.id} className="border border-slate-200 dark:border-slate-700 rounded p-2 flex flex-col gap-2 max-w-sm">
