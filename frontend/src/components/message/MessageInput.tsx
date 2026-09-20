@@ -4,6 +4,7 @@ import { apiRequest } from '../../services/api'
 import EmojiPicker from 'emoji-picker-react'
 import { Smile, Paperclip, X, Mic, Square, Trash2 } from 'lucide-react'
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder'
+import { useMessageStore } from '../../store/messageStore'
 
 interface MessageInputProps {
   channelId?: string
@@ -83,6 +84,14 @@ export function MessageInput({ channelId, conversationId, threadMessageId, onThr
       if (!response.ok) {
         const data = await response.json().catch(() => ({}))
         alert(`File upload failed: ${data.message || data.error || response.statusText}`)
+      } else {
+        const data = await response.json()
+        if (data.file) {
+          const roomId = channelId || conversationId
+          if (roomId) {
+            useMessageStore.getState().addFile(roomId, messageId, data.file)
+          }
+        }
       }
     } catch (err: any) {
       console.error('File upload failed', err)

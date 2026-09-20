@@ -54,12 +54,26 @@ export const uploadFile: RequestHandler<{ messageId: string }> = async (req, res
       return
     }
 
+    const isVoice = file.mimetype.startsWith('audio/') || file.originalname.endsWith('.webm') || file.originalname.startsWith('voice-')
+    const isImage = file.mimetype.startsWith('image/')
+    let fileUrl = `/uploads/${file.filename}`
+
+    if ((isVoice || isImage) && file.size < 1.5 * 1024 * 1024) {
+      try {
+        const buffer = fs.readFileSync(file.path)
+        const mime = file.mimetype || (isVoice ? 'audio/webm' : 'image/jpeg')
+        fileUrl = `data:${mime};base64,${buffer.toString('base64')}`
+      } catch (err) {
+        console.error('Failed to encode file to base64, falling back to disk URL', err)
+      }
+    }
+
     const fileRecord = await prisma.file.create({
       data: {
         messageId,
         originalName: file.originalname,
         storageKey: file.filename,
-        url: `/uploads/${file.filename}`, // In a real app this would be a full URL/CDN
+        url: fileUrl,
         mimeType: file.mimetype,
         size: file.size
       }
