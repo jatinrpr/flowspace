@@ -26,8 +26,11 @@ export const initializeSocket = () => {
 
   useSocketStore.setState({ isConnecting: true })
 
+  const token = typeof window !== 'undefined' ? localStorage.getItem('flowspace_token') : null
+
   socket = io(SOCKET_URL, {
     withCredentials: true,
+    auth: { token },
     reconnection: true,
     reconnectionDelay: 1000,
   })

@@ -5,6 +5,7 @@ import type { AuthUser } from '../types/auth'
 interface UserResponse {
   success: true
   user: AuthUser
+  accessToken?: string
 }
 
 interface AuthStore {
@@ -29,10 +30,15 @@ const setAuthenticated = (user: AuthUser) => ({
   isAuthenticated: true,
   isLoading: false,
 })
-const setUnauthenticated = {
-  user: null,
-  isAuthenticated: false,
-  isLoading: false,
+const setUnauthenticated = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('flowspace_token')
+  }
+  return {
+    user: null,
+    isAuthenticated: false,
+    isLoading: false,
+  }
 }
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
@@ -44,6 +50,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       method: 'POST',
       body: JSON.stringify(input),
     })
+    if (response.accessToken && typeof window !== 'undefined') {
+      localStorage.setItem('flowspace_token', response.accessToken)
+    }
     set(setAuthenticated(response.user))
   },
   login: async (input) => {
@@ -51,13 +60,16 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       method: 'POST',
       body: JSON.stringify(input),
     })
+    if (response.accessToken && typeof window !== 'undefined') {
+      localStorage.setItem('flowspace_token', response.accessToken)
+    }
     set(setAuthenticated(response.user))
   },
   logout: async () => {
     try {
       await apiRequest('/auth/logout', { method: 'POST' })
     } finally {
-      set(setUnauthenticated)
+      set(setUnauthenticated())
     }
   },
   fetchCurrentUser: async () => {

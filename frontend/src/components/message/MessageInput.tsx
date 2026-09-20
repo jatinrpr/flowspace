@@ -68,12 +68,16 @@ export function MessageInput({ channelId, conversationId, threadMessageId, onThr
     const formData = new FormData()
     formData.append('file', uploadFile)
     try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('flowspace_token') : null
       const response = await fetch(
         `${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : 'http://localhost:5000'}/api/messages/${messageId}/files`,
         {
           method: 'POST',
           body: formData,
-          credentials: 'include'
+          credentials: 'include',
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          }
         }
       )
       if (!response.ok) {

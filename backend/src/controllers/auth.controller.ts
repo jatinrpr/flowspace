@@ -16,6 +16,7 @@ export const signup: RequestHandler = async (request, response) => {
   response.status(201).json({
     success: true,
     message: 'Account created successfully',
+    accessToken: result.accessToken,
     user: result.user,
   })
 }
@@ -28,6 +29,7 @@ export const login: RequestHandler = async (request, response) => {
   response.status(200).json({
     success: true,
     message: 'Logged in successfully',
+    accessToken: result.accessToken,
     user: result.user,
   })
 }
@@ -50,7 +52,7 @@ export const refresh: RequestHandler = async (request, response) => {
 
   const tokens = await authService.refresh(refreshToken, request)
   setAuthCookies(response, tokens.accessToken, tokens.refreshToken)
-  response.status(200).json({ success: true, message: 'Session refreshed' })
+  response.status(200).json({ success: true, message: 'Session refreshed', accessToken: tokens.accessToken })
 }
 
 export const logout: RequestHandler = async (request, response) => {

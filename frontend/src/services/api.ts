@@ -20,11 +20,14 @@ export const apiRequest = async <T>(
     ? `${basePath}${endpointPath}`
     : `${basePath}/api${endpointPath}`
 
+  const token = typeof window !== 'undefined' ? localStorage.getItem('flowspace_token') : null
+
   const response = await fetch(targetUrl, {
     ...options,
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
   })

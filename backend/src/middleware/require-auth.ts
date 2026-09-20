@@ -3,7 +3,11 @@ import { AppError } from '../utils/app-error.js'
 import { verifyAccessToken } from '../utils/token.js'
 
 export const requireAuth: RequestHandler = (request, _response, next) => {
-  const token = request.cookies.access_token as string | undefined
+  const authHeader = request.headers.authorization
+  const headerToken = authHeader?.startsWith('Bearer ')
+    ? authHeader.slice(7)
+    : undefined
+  const token = headerToken || (request.cookies.access_token as string | undefined)
 
   if (!token) {
     next(new AppError('Authentication required', 401))
