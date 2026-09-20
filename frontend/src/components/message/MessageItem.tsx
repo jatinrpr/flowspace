@@ -105,7 +105,10 @@ export function MessageItem({ message, onOpenThread }: MessageItemProps) {
         ) : (
           <div className="mt-0.5 text-slate-800 dark:text-slate-300">
             {message.type === 'VOICE' && message.files?.[0] ? (
-              <VoiceMessage url={message.files[0].url.startsWith('http') ? message.files[0].url : `${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '') : 'http://localhost:5000'}${message.files[0].url}`} />
+              <VoiceMessage 
+                url={message.files[0].url.startsWith('http') ? message.files[0].url : `${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '') : 'http://localhost:5000'}${message.files[0].url}`} 
+                initialDuration={message.content && !isNaN(Number(message.content)) && Number(message.content) > 0 ? Number(message.content) : undefined}
+              />
             ) : (
               <FormattedContent content={message.content} mentions={message.mentions} />
             )}

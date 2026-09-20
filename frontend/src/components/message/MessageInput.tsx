@@ -110,13 +110,15 @@ export function MessageInput({ channelId, conversationId, threadMessageId, onThr
 
     try {
       const mentionedUserIds = await fetchMentions()
-      const messageType = voiceRecorder.audioBlob ? 'VOICE' : (file ? 'FILE' : 'TEXT')
+      const isVoice = !!voiceRecorder.audioBlob
+      const messageType = isVoice ? 'VOICE' : (file ? 'FILE' : 'TEXT')
+      const messageContent = isVoice ? String(voiceRecorder.duration || 0) : trimmed
 
       if (threadMessageId) {
         // Send Thread Reply
         const res = await apiRequest<{ success: boolean, reply: any }>(`/messages/${threadMessageId}/thread`, {
           method: 'POST',
-          body: JSON.stringify({ content: trimmed, type: messageType })
+          body: JSON.stringify({ content: messageContent, type: messageType })
         })
         
         if (res.success && uploadPayload) {
@@ -134,7 +136,7 @@ export function MessageInput({ channelId, conversationId, threadMessageId, onThr
       const payload = {
         channelId,
         conversationId,
-        content: trimmed,
+        content: messageContent,
         type: messageType,
         clientMessageId: Date.now().toString(),
         mentionedUserIds

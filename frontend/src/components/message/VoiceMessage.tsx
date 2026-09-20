@@ -3,45 +3,93 @@ import { Play, Pause } from 'lucide-react'
 
 interface VoiceMessageProps {
   url: string
+  initialDuration?: number
 }
 
-export function VoiceMessage({ url }: VoiceMessageProps) {
+export function VoiceMessage({ url, initialDuration }: VoiceMessageProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [progress, setProgress] = useState(0)
-  const [duration, setDuration] = useState(0)
+  const [duration, setDuration] = useState(initialDuration && initialDuration > 0 ? initialDuration : 0)
   const [playbackRate, setPlaybackRate] = useState(1)
   const audioRef = useRef<HTMLAudioElement>(null)
+
+  useEffect(() => {
+    if (initialDuration && initialDuration > 0) {
+      setDuration(initialDuration)
+    }
+  }, [initialDuration])
 
   useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
 
-    const updateProgress = () => setProgress(audio.currentTime)
-    const updateDuration = () => setDuration(audio.duration)
+    const updateDuration = () => {
+      const d = audio.duration
+      if (d && !isNaN(d) && isFinite(d) && d > 0) {
+        setDuration(Math.round(d))
+      } else if (d === Infinity) {
+        // Fix for Chromium MediaRecorder WebM bug where duration reports as Infinity
+        audio.currentTime = 1e101
+        audio.ontimeupdate = () => {
+          audio.ontimeupdate = null
+          if (audio.duration && isFinite(audio.duration) && audio.duration > 0) {
+            setDuration(Math.round(audio.duration))
+          } else if (audio.currentTime > 0) {
+            setDuration(Math.round(audio.currentTime))
+          }
+          audio.currentTime = 0
+        }
+      }
+    }
+
+    const updateProgress = () => {
+      setProgress(audio.currentTime)
+      const d = audio.duration
+      if (d && !isNaN(d) && isFinite(d) && d > 0 && (!duration || duration === 0)) {
+        setDuration(Math.round(d))
+      }
+    }
+
     const handleEnded = () => {
       setIsPlaying(false)
       setProgress(0)
     }
 
+    const handlePlay = () => setIsPlaying(true)
+    const handlePause = () => setIsPlaying(false)
+
     audio.addEventListener('timeupdate', updateProgress)
     audio.addEventListener('loadedmetadata', updateDuration)
+    audio.addEventListener('durationchange', updateDuration)
+    audio.addEventListener('canplay', updateDuration)
+    audio.addEventListener('canplaythrough', updateDuration)
+    audio.addEventListener('play', handlePlay)
+    audio.addEventListener('pause', handlePause)
     audio.addEventListener('ended', handleEnded)
+
+    if (audio.readyState >= 1) {
+      updateDuration()
+    }
 
     return () => {
       audio.removeEventListener('timeupdate', updateProgress)
       audio.removeEventListener('loadedmetadata', updateDuration)
+      audio.removeEventListener('durationchange', updateDuration)
+      audio.removeEventListener('canplay', updateDuration)
+      audio.removeEventListener('canplaythrough', updateDuration)
+      audio.removeEventListener('play', handlePlay)
+      audio.removeEventListener('pause', handlePause)
       audio.removeEventListener('ended', handleEnded)
     }
-  }, [])
+  }, [url])
 
   const togglePlayPause = () => {
     if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause()
+      if (audioRef.current.paused) {
+        audioRef.current.play().catch(console.error)
       } else {
-        audioRef.current.play()
+        audioRef.current.pause()
       }
-      setIsPlaying(!isPlaying)
     }
   }
 
