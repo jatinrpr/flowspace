@@ -1,22 +1,11 @@
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
-import { isProduction } from '../config/env.js'
 
-// Security headers with Helmet configured for WebRTC & WebSocket compatibility
+// Security headers with Helmet configured for cross-origin assets, WebRTC & WebSockets
 export const securityHeaders = helmet({
-  contentSecurityPolicy: isProduction
-    ? {
-        directives: {
-          defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", "'unsafe-inline'"],
-          styleSrc: ["'self'", "'unsafe-inline'"],
-          imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
-          mediaSrc: ["'self'", 'blob:', 'data:'],
-          connectSrc: ["'self'", 'ws:', 'wss:', 'https:'],
-        },
-      }
-    : false, // Disable CSP in dev for Vite HMR
+  contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
 })
 
 // Authentication Rate Limiter (login, signup, password reset)

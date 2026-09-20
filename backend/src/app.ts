@@ -30,7 +30,16 @@ app.use(
 app.use('/api', apiLimiter)
 app.use(express.json({ limit: '10mb' }))
 app.use(cookieParser())
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')))
+app.use(
+  '/uploads',
+  cors({ origin: env.frontendUrl, credentials: true }),
+  (_req, res, next) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+    res.setHeader('Access-Control-Allow-Origin', env.frontendUrl)
+    next()
+  },
+  express.static(path.join(process.cwd(), 'uploads')),
+)
 app.use('/api', apiRouter)
 app.use(notFound)
 app.use(errorHandler)

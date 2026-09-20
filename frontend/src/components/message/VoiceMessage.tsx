@@ -85,8 +85,14 @@ export function VoiceMessage({ url, initialDuration }: VoiceMessageProps) {
 
   const togglePlayPause = () => {
     if (audioRef.current) {
+      if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
+        audioRef.current.currentTime = 0
+        setProgress(0)
+      }
       if (audioRef.current.paused) {
-        audioRef.current.play().catch(console.error)
+        audioRef.current.play().catch(err => {
+          console.error('Audio playback error:', err)
+        })
       } else {
         audioRef.current.pause()
       }
