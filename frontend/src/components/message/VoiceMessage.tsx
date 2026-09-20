@@ -27,18 +27,6 @@ export function VoiceMessage({ url, initialDuration }: VoiceMessageProps) {
       const d = audio.duration
       if (d && !isNaN(d) && isFinite(d) && d > 0) {
         setDuration(Math.round(d))
-      } else if (d === Infinity) {
-        // Fix for Chromium MediaRecorder WebM bug where duration reports as Infinity
-        audio.currentTime = 1e101
-        audio.ontimeupdate = () => {
-          audio.ontimeupdate = null
-          if (audio.duration && isFinite(audio.duration) && audio.duration > 0) {
-            setDuration(Math.round(audio.duration))
-          } else if (audio.currentTime > 0) {
-            setDuration(Math.round(audio.currentTime))
-          }
-          audio.currentTime = 0
-        }
       }
     }
 
@@ -53,6 +41,7 @@ export function VoiceMessage({ url, initialDuration }: VoiceMessageProps) {
     const handleEnded = () => {
       setIsPlaying(false)
       setProgress(0)
+      if (audioRef.current) audioRef.current.currentTime = 0
     }
 
     const handlePlay = () => setIsPlaying(true)
@@ -84,18 +73,21 @@ export function VoiceMessage({ url, initialDuration }: VoiceMessageProps) {
   }, [url])
 
   const togglePlayPause = () => {
-    if (audioRef.current) {
-      if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
-        audioRef.current.currentTime = 0
-        setProgress(0)
-      }
-      if (audioRef.current.paused) {
-        audioRef.current.play().catch(err => {
-          console.error('Audio playback error:', err)
-        })
-      } else {
-        audioRef.current.pause()
-      }
+    const audio = audioRef.current
+    if (!audio) return
+
+    if (audio.ended || (duration > 0 && audio.currentTime >= duration)) {
+      audio.currentTime = 0
+      setProgress(0)
+    }
+
+    if (audio.paused) {
+      audio.play().catch(err => {
+        console.error('Audio playback error:', err)
+        alert('Playback error: ' + (err.message || 'File unavailable'))
+      })
+    } else {
+      audio.pause()
     }
   }
 
